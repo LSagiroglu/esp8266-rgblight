@@ -34,9 +34,9 @@
 
 
 
-const int redPin = D5;
-const int greenPin = D1;
-const int bluePin = D6;
+const int redPin = 14;//D5;
+const int greenPin = 12;//D1;
+const int bluePin = 5;//D6;
 
 // Topics
 const char* light_state_topic = "home/rgb1";
@@ -177,9 +177,12 @@ void sendState() {
 
 void setColor(int inR, int inG, int inB) {
   // since the LED strips are common anode, 255 = off and 0 = on; invert the numbers here: 
-  analogWrite(redPin, 255-inR);
+  /*analogWrite(redPin, 255-inR);
   analogWrite(greenPin, 255-inG);
-  analogWrite(bluePin, 255-inB);
+  analogWrite(bluePin, 255-inB);*/
+  analogWrite(redPin, inR);
+  analogWrite(greenPin, inG);
+  analogWrite(bluePin, inB);
 }
 
 
@@ -190,9 +193,9 @@ void setup() {
   pinMode(greenPin, OUTPUT);
   pinMode(bluePin, OUTPUT);
   analogWriteRange(255);
-  digitalWrite(redPin, 0);
-  digitalWrite(greenPin, 0);
-  digitalWrite(bluePin, 0);
+  digitalWrite(redPin, 255);
+  digitalWrite(greenPin, 255);
+  digitalWrite(bluePin, 255);
   
   setupBaseFunctions(); // <-- must be FIRST
   // at this point you're connected, MQTT is working serial is enabled 115200

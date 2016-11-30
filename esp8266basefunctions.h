@@ -234,6 +234,7 @@ void setupBaseFunctions() {
   // send it through a loop of the normal run to connect and get MQTT working before proceeding
   loopBaseFunctions();
   loopBaseFunctions();
+  Serial.printf("Base heap size: %u\n", ESP.getFreeHeap());
 }
 
 void loopBaseFunctions() {
