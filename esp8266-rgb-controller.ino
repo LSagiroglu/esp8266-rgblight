@@ -28,6 +28,7 @@
 //#include <ESP8266WebServer.h> // <-- this is needed for both WifiManager and OTA; included above
 #include <ESP8266mDNS.h>
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#define REFORMAT 0
 // Compressed everything into this .h file, to clean up the actual function
 //#include "esp8266basefunctions.h"
 // Functions and variables used in the Wifi 
@@ -38,7 +39,7 @@ void reconnect();
 // #wifimanager - these are offered on WifiManager 
 char mqtt_server[20];
 char mqtt_port[6] = "1883";
-char mqtt_subscribe_topic[25] = "home/esp/kitchen/set";
+char mqtt_topic[25] = "home/esp/kitchen";
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -46,14 +47,18 @@ void MQTTcallback(char*, byte*, unsigned int);
 WiFiClient espClient;
 PubSubClient client(espClient);
 // Topics
-const char* light_state_topic = "home/esp/kitchen";
-//const char* mqtt_subscribe_topic = "home/esp/kitchen/set";
+//const char* light_state_topic = "home/esp/kitchen";
+//const char* mqtt_topic = "home/esp/kitchen/set";
 
 // this will hold the hostname, like esp8266-123456 
 char host[20] = "esp8266-test";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+#include <IRremoteESP8266.h>
+#define RECV_PIN  4
+IRrecv irrecv(RECV_PIN);
+decode_results results;
+#include "ircodes.h"
 const int redPin = 14;//D5;
 const int greenPin = 12;//D1;
 const int bluePin = 5;//D6;
@@ -111,6 +116,7 @@ void setup() {
   Serial.println("Updating MQTT after boot");
   //and now that we're connected, notify HomeAssistant that we're on and bright
   sendState();
+  irrecv.enableIRIn();
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -191,7 +197,7 @@ void sendState() {
   root["brightness"] = brightness;
   char buffer[root.measureLength() + 1];
   root.printTo(buffer, sizeof(buffer));
-  client.publish(light_state_topic, buffer, true);
+  client.publish(mqtt_topic, buffer, true);
 }
 
 
@@ -201,6 +207,31 @@ void setColor(int inR, int inG, int inB) {
   analogWrite(bluePin, inB);
 }
 
+void setLightColour(long inColour) {
+  /* setLightColour - change the colour of the light strip
+      Input: long inColour - should be a hex string of format FFFFFF
+             where colours are RGB.
+      Return: Return 0 if successful completion of setting the lights.
+       Required constants: REDPIN, GREENPIN, BLUEPIN to be set
+  */
+
+  // Split the colour number into the individual channels
+  blue = inColour % 0x100;
+  green = (inColour / 0x100) % 0x100;
+  red = (inColour / 0x100 / 0x100) % 0x100;
+  // Write each colour to the correct pin, using analogwrite
+  // to allow for dimmable PWMing
+  if (inColour == 0) 
+    stateOn=0;
+  else
+    stateOn=1;
+  realRed = map(red, 0, 255, 0, brightness);
+  realGreen = map(green, 0, 255, 0, brightness);
+  realBlue = map(blue, 0, 255, 0, brightness);
+  startFade = true;
+  inFade = false; // Kill the current fade
+  sendState();
+}
 
 
 void loop() {
@@ -243,6 +274,125 @@ void loop() {
       }
     }
   }
+  if (irrecv.decode(&results)) {
+    Serial.println(results.value, HEX);
+    irrecv.resume(); // Receive the next value
+    switch (results.value) {
+      case KEY44_BRIGHTER:
+        break;
+      case KEY44_DIMMER:
+        break;
+      case KEY44_PLAY:
+        setLightColour(0xdddddd);
+        break;
+      case KEY44_POWER:
+        setLightColour(0x000000); //off
+        break;
+      case KEY44_RED:
+        setLightColour(0xcc0000);
+        break;
+      case KEY44_GREEN:
+        setLightColour(0x00cc00);
+        break;
+      case KEY44_BLUE:
+        setLightColour(0x0000cc);
+        break;
+      case KEY44_WHITE:
+        setLightColour(0xffffff); //on full
+        break;
+      case KEY44_C1:
+        setLightColour(0xcc2200); //dark orange
+        break;
+      case KEY44_C2:
+        setLightColour(0x02cc22); //greeny
+        break;
+      case KEY44_C3:
+        setLightColour(0x0222cc); //bluey
+        break;
+      case KEY44_C4:
+        setLightColour(0xFBEC5D); // pale yellow
+        break;
+      case KEY44_C5:
+        setLightColour(0xcc4411); //orangy
+        break;
+      case KEY44_C6:
+        setLightColour(0x22cc88); //greeny blue
+        break;
+      case KEY44_C7:
+        setLightColour(0x5522cc); //purply blue
+        break;
+      case KEY44_C8:
+        setLightColour(0xFC99DD); //pink
+        break;
+      case KEY44_C9:
+        setLightColour(0xcc7700); //orange
+        break;
+      case KEY44_C10:
+        setLightColour(0x55ddaa); // bluer green
+        break;
+      case KEY44_C11:
+        setLightColour(0x6600cc); //purple
+        break;
+      case KEY44_C12:
+        setLightColour(0x7BAC9D); //some blue green colour
+        break;
+      case KEY44_C13:
+        setLightColour(0xcccc00); // yellow
+        break;
+      case KEY44_C14:
+        setLightColour(0x23bbaa); //blueish
+        break;
+      case KEY44_C15:
+        setLightColour(0xcc00cc); //magenta
+        break;
+      case KEY44_C16:
+        setLightColour(0xddffdd); //whitiesh with green
+        break;
+      case KEY44_REDUP:
+        break;
+      case KEY44_GREENUP:
+        break;
+      case KEY44_BLUEUP:
+        break;
+      case KEY44_QUICK: //speeds up rainbow function by reducing number of colours and delay
+        break;
+      case KEY44_REDDOWN:
+        break;
+      case KEY44_GREENDOWN:
+        break;
+      case KEY44_BLUEDOWN:
+        break;
+      case KEY44_SLOW: //slows down rainbow function by increasing delay and number of colours
+        break;
+      case KEY44_DIY1:
+        break;
+      case KEY44_DIY2:
+        break;
+      case KEY44_DIY3:
+        break;
+      case KEY44_AUTO:
+        break;
+      case KEY44_DIY4:
+        break;
+      case KEY44_DIY5:
+        break;
+      case KEY44_DIY6:
+        break;
+      case KEY44_FLASH:
+        break;
+      case KEY44_JUMP3:
+        break;
+      case KEY44_JUMP7:
+        break;
+      case KEY44_FADE3:
+        break;
+      case KEY44_FADE7:
+        break;
+      case 0xFFFFFF:
+        break;
+    }
+  }
+
   //run at the end of each cycle:
   loopBaseFunctions();
 }
@@ -304,7 +454,9 @@ void reconnect() {
       // Once connected, publish an announcement...
       client.publish("esp8266boot","connected");
       // ... and resubscribe
-      client.subscribe(mqtt_subscribe_topic);
+      char subbuf[25];
+      snprintf(subbuf, 25, "%s/%s", mqtt_topic, "set"); 
+      client.subscribe(subbuf);
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -334,7 +486,9 @@ void setupBaseFunctions() {
   if (SPIFFS.begin()) {
     //clean FS, for testing
     //
-    //SPIFFS.format();              // this will forget all custom params (MQTT)
+    #if REFORMAT == 1
+    SPIFFS.format();              // this will forget all custom params (MQTT)
+    #endif
     Serial.println("mounted file system");
     if (SPIFFS.exists("/config.json")) {
       //file exists, reading and loading
@@ -355,7 +509,7 @@ void setupBaseFunctions() {
 
           strcpy(mqtt_server, json["mqtt_server"]);
           strcpy(mqtt_port, json["mqtt_port"]);
-          strcpy(mqtt_subscribe_topic, json["mqtt_subscribe_topic"]);
+          strcpy(mqtt_topic, json["mqtt_topic"]);
 
         } else {
           Serial.println("failed to load json config");
@@ -372,12 +526,14 @@ void setupBaseFunctions() {
   // id/name placeholder/prompt default length
   WiFiManagerParameter custom_mqtt_server("server", "192.168.140.14", mqtt_server, 20);
   WiFiManagerParameter custom_mqtt_port("port", "1883", mqtt_port, 5);
-  WiFiManagerParameter custom_mqtt_subscribe("subscribe", "home/esp/kitchen/set", mqtt_subscribe_topic, 25);
+  WiFiManagerParameter custom_mqtt_subscribe("subscribe", "home/esp/kitchen/set", mqtt_topic, 25);
   
   WiFiManager wifiManager;
 
   //reset settings - for testing - DO BOTH!!
-  //wifiManager.resetSettings();  // this will forget wifi/pass 
+  #if REFORMAT == 1
+  wifiManager.resetSettings();  // this will forget wifi/pass 
+  #endif
   //SPIFFS.format();              // this will forget all custom params (MQTT)
   // you may need to do SPIFFS.format() above if a new param is involved
 
@@ -421,7 +577,7 @@ void setupBaseFunctions() {
   //read updated parameters
   strcpy(mqtt_server, custom_mqtt_server.getValue());
   strcpy(mqtt_port, custom_mqtt_port.getValue());
-  strcpy(mqtt_subscribe_topic, custom_mqtt_subscribe.getValue());
+  strcpy(mqtt_topic, custom_mqtt_subscribe.getValue());
 
   //save the custom parameters to FS
   if (shouldSaveConfig) {
@@ -430,7 +586,7 @@ void setupBaseFunctions() {
     JsonObject& json = jsonBuffer.createObject();
     json["mqtt_server"] = mqtt_server;
     json["mqtt_port"] = mqtt_port;
-    json["mqtt_subscribe_topic"] = mqtt_subscribe_topic;
+    json["mqtt_topic"] = mqtt_topic;
 
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) {
